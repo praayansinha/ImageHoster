@@ -1,8 +1,10 @@
 package ImageHoster.controller;
 
+import ImageHoster.model.Comment;
 import ImageHoster.model.Image;
 import ImageHoster.model.Tag;
 import ImageHoster.model.User;
+import ImageHoster.service.CommentService;
 import ImageHoster.service.ImageService;
 import ImageHoster.service.TagService;
 import ImageHoster.service.UserService;
@@ -28,9 +30,14 @@ public class ImageController {
     @Autowired
     private TagService tagService;
 
+    @Autowired
+    private CommentService commentService;
+
     //This method displays all the images in the user home page after successful login
     @RequestMapping("images")
-    public String getUserImages(Model model) {
+    public String getUserImages(Model model, HttpSession session) {
+        User user = (User) session.getAttribute("loggeduser");
+        model.addAttribute("User", user);
         List<Image> images = imageService.getAllImages();
         model.addAttribute("images", images);
         return "images";
@@ -48,12 +55,12 @@ public class ImageController {
     //this list is then sent to 'images/image.html' file and the tags are displayed
     @RequestMapping("/images/{imageId}/{title}")
     public String showImage(@PathVariable("imageId") Integer imageId,
-                            @PathVariable("title")String title,
-                            Model model) {
+                            @PathVariable("title") String title, Model model) {
 
-        Image image = imageService.getImageById(imageId);
+        Image image = imageService.getImage(imageId);
         model.addAttribute("image", image);
         model.addAttribute("tags", image.getTags());
+        model.addAttribute("comments", image.getComments());
         return "images/image";
     }
 
@@ -75,7 +82,8 @@ public class ImageController {
     //Store all the tags in the database and make a list of all the tags using the findOrCreateTags() method
     //set the tags attribute of the image as a list of all the tags returned by the findOrCreateTags() method
     @RequestMapping(value = "/images/upload", method = RequestMethod.POST)
-    public String createImage(@RequestParam("file") MultipartFile file, @RequestParam("tags") String tags, Image newImage, HttpSession session) throws IOException {
+    public String createImage(@RequestParam("file") MultipartFile file, @RequestParam("tags") String tags,
+                              Image newImage, HttpSession session) throws IOException {
 
         User user = (User) session.getAttribute("loggeduser");
         newImage.setUser(user);
@@ -89,6 +97,7 @@ public class ImageController {
         return "redirect:/images";
     }
 
+
     //This controller method is called when the request pattern is of type 'editImage'
     //This method fetches the image with the corresponding id from the database and adds it to the model with the key as 'image'
     //The method then returns 'images/edit.html' file wherein you fill all the updated details of the image
@@ -96,27 +105,28 @@ public class ImageController {
     //The method first needs to convert the list of all the tags to a string containing all the tags separated by a comma and then add this string in a Model type object
     //This string is then displayed by 'edit.html' file as previous tags of an image
     @RequestMapping(value = "/editImage")
-    public String editImage(@RequestParam("imageId") Integer imageId, ModelMap model) {
+    public String editImage(@RequestParam("imageId") Integer imageId, ModelMap model,
+                            HttpSession session) {
 
         Image image = imageService.getImage(imageId);
 
-        String imageUser = image.getUser().getUsername();
-        String loggedUser = model.get("name").toString();
-
+        User imageUser = image.getUser();
+        User loggedUser = (User) session.getAttribute("loggeduser");
 
         model.addAttribute("image", image);
 
-        if (!imageUser.equals(loggedUser)) {
+        if (!imageUser.getUsername().equals(loggedUser.getUsername())) {
             model.addAttribute("tags", image.getTags());
             String error = "Only the owner of the image can edit the image";
             model.addAttribute("editError", error);
+            model.addAttribute("comments", image.getComments());
+            model.addAttribute("comments", image.getComments());
             return "images/image";
         } else {
             String tags = convertTagsToString(image.getTags());
             model.addAttribute("tags", tags);
             return "images/edit";
         }
-
     }
 
     //This controller method is called when the request pattern is of type 'images/edit' and also the incoming request is of PUT type
@@ -131,7 +141,9 @@ public class ImageController {
     //The method also receives tags parameter which is a string of all the tags separated by a comma using the annotation @RequestParam
     //The method converts the string to a list of all the tags using findOrCreateTags() method and sets the tags attribute of an image as a list of all the tags
     @RequestMapping(value = "/editImage", method = RequestMethod.PUT)
-    public String editImageSubmit(@RequestParam("file") MultipartFile file, @RequestParam("imageId") Integer imageId, @RequestParam("tags") String tags, Image updatedImage, HttpSession session) throws IOException {
+    public String editImageSubmit(@RequestParam("file") MultipartFile file, @RequestParam("imageId") Integer imageId,
+                                  @RequestParam("tags") String tags, Image updatedImage,
+                                  HttpSession session) throws IOException {
 
         Image image = imageService.getImage(imageId);
         String updatedImageData = convertUploadedFileToBase64(file);
@@ -159,16 +171,18 @@ public class ImageController {
     //Looks for a controller method with request mapping of type '/images'
     @RequestMapping(value = "/deleteImage", method = RequestMethod.DELETE)
     public String deleteImageSubmit(@RequestParam(name = "imageId") Integer imageId,
-                                    ModelMap modelMap) {
+                                    ModelMap modelMap,HttpSession session) {
+
         Image image = imageService.getImage(imageId);
-        String imageUser = image.getUser().getUsername();
-        String loggedUser = modelMap.get("name").toString();
-        if (!imageUser.equals(loggedUser)) {
+        User imageUser = image.getUser();
+        User loggedUser = (User) session.getAttribute("loggeduser");
+
+        if (!imageUser.getUsername().equals(loggedUser.getUsername()) ) {
             String error = "Only the owner of the image can delete the image";
             modelMap.addAttribute("image", image);
             modelMap.addAttribute("tags", image.getTags());
             modelMap.addAttribute("deleteError", error);
-
+            modelMap.addAttribute("comments", image.getComments());
             return "images/image";
         } else {
             imageService.deleteImage(imageId);

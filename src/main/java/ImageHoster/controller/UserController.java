@@ -8,14 +8,19 @@ import ImageHoster.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.ui.ModelMap;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpSession;
+import javax.validation.Valid;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 @Controller
+@SessionAttributes("name")
 public class UserController {
 
     @Autowired
@@ -40,9 +45,28 @@ public class UserController {
     //This controller method is called when the request pattern is of type 'users/registration' and also the incoming request is of POST type
     //This method calls the business logic and after the user record is persisted in the database, directs to login page
     @RequestMapping(value = "users/registration", method = RequestMethod.POST)
-    public String registerUser(User user) {
-        userService.registerUser(user);
-        return "redirect:/users/login";
+    public String registerUser(User user, Model model) {
+
+        String regex = "^(?=.*\\d)(?=.*[a-zA-Z])(?=^\\S*$)(?=.*[!@#$%^&*()?:/]).{3,20}$";
+        Pattern pattern = Pattern.compile(regex);
+        String password = user.getPassword();
+        Matcher m = pattern.matcher(password);
+
+        if (password == null || !m.matches()) {
+            String error = "Password must contain atleast 1 alphabet, 1 number & 1 special " +
+                    "character";
+
+            User newUser = new User();
+            UserProfile profile = new UserProfile();
+            newUser.setProfile(profile);
+            model.addAttribute("User", newUser);
+            model.addAttribute("passwordTypeError", error);
+            return "users/registration";
+        } else {
+            model.addAttribute("User",user);
+            userService.registerUser(user);
+            return "users/login";
+        }
     }
 
     //This controller method is called when the request pattern is of type 'users/login'
@@ -54,12 +78,12 @@ public class UserController {
     //This controller method is called when the request pattern is of type 'users/login' and also the incoming request is of POST type
     //The return type of the business logic is changed to User type instead of boolean type. The login() method in the business logic checks whether the user with entered username and password exists in the database and returns the User type object if user with entered username and password exists in the database, else returns null
     //If user with entered username and password exists in the database, add the logged in user in the Http Session and direct to user homepage displaying all the images in the application
-    //If user with entered username and password does not exist in the database, redirect to the same login page
     @RequestMapping(value = "users/login", method = RequestMethod.POST)
-    public String loginUser(User user, HttpSession session) {
+    public String loginUser(User user, HttpSession session, ModelMap model) {
         User existingUser = userService.login(user);
         if (existingUser != null) {
             session.setAttribute("loggeduser", existingUser);
+            model.put("name",existingUser.getUsername());
             return "redirect:/images";
         } else {
             return "users/login";
@@ -77,6 +101,7 @@ public class UserController {
 
         List<Image> images = imageService.getAllImages();
         model.addAttribute("images", images);
+
         return "index";
     }
 }
