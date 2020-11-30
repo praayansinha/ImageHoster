@@ -14,7 +14,6 @@ public class ImageRepository {
     @PersistenceUnit(unitName = "imageHoster")
     private EntityManagerFactory emf;
 
-
     //The method receives the Image object to be persisted in the database
     //Creates an instance of EntityManager
     //Starts a transaction
@@ -50,11 +49,13 @@ public class ImageRepository {
     //Executes JPQL query to fetch the image from the database with corresponding title
     //Returns the image in case the image is found in the database
     //Returns null if no image is found in the database
-    public Image getImageByTitle(String title) {
+    public Image getImageById(Integer imageId) {
         EntityManager em = emf.createEntityManager();
         try {
-            TypedQuery<Image> typedQuery = em.createQuery("SELECT i from Image i where i.title =:title", Image.class).setParameter("title", title);
-            return typedQuery.getSingleResult();
+//            TypedQuery<Image> typedQuery = em.createQuery("SELECT i from Image i where i.id " +
+//                    "=:id", Image.class).setParameter("id", id);
+            Image image = em.find(Image.class, imageId);
+            return image;
         } catch (NoResultException nre) {
             return null;
         }
@@ -65,8 +66,9 @@ public class ImageRepository {
     //Returns the image fetched from the database
     public Image getImage(Integer imageId) {
         EntityManager em = emf.createEntityManager();
-        TypedQuery<Image> typedQuery = em.createQuery("SELECT i from Image i where i.id =:imageId", Image.class).setParameter("imageId", imageId);
-        Image image = typedQuery.getSingleResult();
+//        TypedQuery<Image> typedQuery = em.createQuery("SELECT i from Image i where i.id =:imageId", Image.class).setParameter("imageId", imageId);
+//        Image image = typedQuery.getSingleResult();
+        Image image = em.find(Image.class, imageId);
         return image;
     }
 
